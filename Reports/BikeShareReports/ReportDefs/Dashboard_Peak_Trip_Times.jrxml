@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Jaspersoft Studio version 7.2.1.final using JasperReports Library version 6.6.0  -->
+<!-- Created with Jaspersoft Studio version 7.3.1.final using JasperReports Library version 6.8.1-3d4b87119c827be13776e451fb3738062f84a87d  -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="Dashboard_Peak_Trip_Times" pageWidth="284" pageHeight="336" columnWidth="284" leftMargin="0" rightMargin="0" topMargin="0" bottomMargin="0" uuid="f6a4b4bb-5500-44c7-9f2e-3eca62fbded4">
 	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
 	<property name="com.jaspersoft.studio.unit." value="pixel"/>
@@ -13,11 +13,11 @@
 	<property name="com.jaspersoft.studio.unit.columnSpacing" value="pixel"/>
 	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="229"/>
 	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="766"/>
-	<property name="ireport.jasperserver.url" value="http://jrs-bikes-elasticl-1k5yhf91vrjuo-1806919984.us-east-2.elb.amazonaws.com/jasperserver-pro/"/>
+	<property name="ireport.jasperserver.url" value="http://localhost:8080/jasperserver-pro/"/>
 	<property name="ireport.jasperserver.user" value="superuser"/>
 	<property name="ireport.jasperserver.reportUnit" value="/public/Bikeshare_demo/Reports/Dashboard_Reports/Dashboard_Peak_Trip_Times"/>
 	<property name="com.jaspersoft.jasperreports.highcharts.interactive" value="false"/>
-	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="Bikeshare demo Local"/>
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="Bikeshare"/>
 	<property name="ireport.jasperserver.report.resource" value="/public/Bikeshare_demo/Reports/Dashboard_Reports/Dashboard_Peak_Trip_Times_files/main_jrxml"/>
 	<import value="java.util.Date"/>
 	<import value="java.time.LocalDate"/>
@@ -56,50 +56,46 @@
 	<parameter name="Session_ID" class="java.lang.String">
 		<parameterDescription><![CDATA[A unique id passed by the web app to combine/merge data by session.]]></parameterDescription>
 	</parameter>
+	<parameter name="RegionClause" class="java.lang.String" isForPrompting="false">
+		<defaultValueExpression><![CDATA[$P{Region} == null || $P{Region}.trim().isEmpty() ? "" : "and region_id = '" + $P{Region}.trim() + "'"]]></defaultValueExpression>
+	</parameter>
 	<queryString>
-		<![CDATA[select details.*, final_min_max.*
- from
-	(Select EXTRACT(HOUR FROM tt.start_time_today)::integer as hour_of_day, Count(*) as trip_count
-				   From trip_today tt
-					inner join station_information si on tt.start_station_id = si.station_id and tt.system_id = si.system_id
-				   where tt.system_id =  $P{Franchise} and ($P{Region} is null OR si.region_id = $P{Region})
-					and date(tt.start_time_today) between $P{Start_Date} and $P{End_Date}
-				   Group By EXTRACT(HOUR FROM tt.start_time_today)::integer
-				   Order By hour_of_day) as details
-
- join
-	(select max(totals.trip_count), min(totals.trip_count), totals.hour_of_day as max_hour
-		from
-			(Select EXTRACT(HOUR FROM tt.start_time_today)::integer as hour_of_day, Count(*) as trip_count
-			   From trip_today tt
-			   inner join station_information si on tt.start_station_id = si.station_id and tt.system_id = si.system_id
-			   where tt.system_id = $P{Franchise} and ($P{Region} is null OR si.region_id = $P{Region})
-				and date(tt.start_time_today) between $P{Start_Date} and $P{End_Date}
-			   Group By EXTRACT(HOUR FROM tt.start_time_today)::integer
-			   Order By Count(*) DESC LIMIT 1) as totals
-	   Group By totals.hour_of_day
-	) as final_min_max 
+		<![CDATA[select h.start_hour as hour_of_day, h.trip_count, m.trip_count as max_count
+from (
+Select start_hour, sum(trip_count) as trip_count
+   From trip_volume_today tt
+   where tt.system_id = $P{Franchise} $P!{RegionClause}
+	  and date(tt.trip_date_today) between $P{Start_Date} and $P{End_Date}
+   Group By start_hour
+   Order By start_hour ) as h
+join
+(
+Select sum(trip_count) as trip_count
+   From trip_volume_today tt
+   where tt.system_id = $P{Franchise}  $P!{RegionClause}
+	  and date(tt.trip_date_today) between $P{Start_Date} and $P{End_Date}
+   Group By start_hour
+   Order By sum(trip_count) desc
+   limit 1   
+) as m 
 on 1=1]]>
 	</queryString>
-	<field name="hour_of_day" class="java.lang.Integer">
+	<field name="hour_of_day" class="java.lang.Double">
 		<property name="com.jaspersoft.studio.field.label" value="hour_of_day"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="trip_volume_today"/>
 	</field>
-	<field name="trip_count" class="java.lang.Long">
+	<field name="trip_count" class="java.math.BigDecimal">
 		<property name="com.jaspersoft.studio.field.label" value="trip_count"/>
 	</field>
-	<field name="max" class="java.lang.Long">
-		<property name="com.jaspersoft.studio.field.label" value="max"/>
-	</field>
-	<field name="min" class="java.lang.Long">
-		<property name="com.jaspersoft.studio.field.label" value="min"/>
-	</field>
-	<field name="max_hour" class="java.lang.Integer">
-		<property name="com.jaspersoft.studio.field.label" value="max_hour"/>
+	<field name="max_count" class="java.math.BigDecimal">
+		<property name="com.jaspersoft.studio.field.label" value="max_count"/>
 	</field>
 	<variable name="FormattedHour" class="java.lang.String">
-		<variableExpression><![CDATA[$F{hour_of_day} < 13 ? 
-	(     $F{hour_of_day} == 0 ? "12am" : $F{hour_of_day} == 12 ? $F{hour_of_day}.toString() + "pm" : $F{hour_of_day}.toString()  + "am"   ) 
-		:   Integer.toString($F{hour_of_day} - 12) + "pm"]]></variableExpression>
+		<variableExpression><![CDATA[java.time.LocalTime.of($F{hour_of_day}.intValue(), 0).format(java.time.format.DateTimeFormatter.ofPattern("ha")).toLowerCase()]]></variableExpression>
+	</variable>
+	<variable name="maxHour" class="java.lang.Integer">
+		<variableExpression><![CDATA[$F{trip_count}.compareTo($F{max_count}) == 0 ? $F{hour_of_day}.intValue() : $V{maxHour}]]></variableExpression>
+		<initialValueExpression><![CDATA[-1]]></initialValueExpression>
 	</variable>
 	<summary>
 		<band height="336" splitType="Stretch">
@@ -186,7 +182,7 @@ on 1=1]]>
 								<axisLevelBucket class="java.lang.Comparable">
 									<bucketExpression><![CDATA[$F{hour_of_day}]]></bucketExpression>
 									<labelExpression><![CDATA[$V{FormattedHour}]]></labelExpression>
-									<bucketProperty name="color"><![CDATA[$F{trip_count}.equals($F{max}) ? "#12c2eb" : "#f0f0f0"]]></bucketProperty>
+									<bucketProperty name="color"><![CDATA[$F{hour_of_day}.intValue() == $V{maxHour} ? "#12c2eb" : "#f0f0f0"]]></bucketProperty>
 								</axisLevelBucket>
 							</axisLevel>
 						</dataAxis>
@@ -222,11 +218,9 @@ on 1=1]]>
 					<property name="com.jaspersoft.studio.unit.height" value="px"/>
 				</reportElement>
 				<textElement verticalAlignment="Bottom">
-					<font size="16" isBold="true"/>
+					<font size="10" isBold="true"/>
 				</textElement>
-				<textFieldExpression><![CDATA[$F{max_hour} <13 ? 
-	(     $F{max_hour} == 0 ? "12am" : $F{max_hour} == 12 ? $F{max_hour}.toString() + "pm" : $F{max_hour}.toString()  + "am"   ) 
-		:   Integer.toString($F{max_hour} - 12) + "pm"]]></textFieldExpression>
+				<textFieldExpression><![CDATA[java.time.LocalTime.of($V{maxHour}, 0).format(java.time.format.DateTimeFormatter.ofPattern("ha")).toLowerCase()]]></textFieldExpression>
 			</textField>
 			<textField isBlankWhenNull="true">
 				<reportElement mode="Transparent" x="140" y="3" width="139" height="77" forecolor="#4A5357" backcolor="#FFFFFF" uuid="e9b8b85b-7438-49c8-84d6-b263f09dc1dd">
