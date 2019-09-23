@@ -6,4 +6,6 @@ Reports/.metadata/
 Reports/BikeShareReports/public/
 Reports/BikeShareReports/.settings/
 
+target
+
 *.prefs
